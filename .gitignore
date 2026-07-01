@@ -15,6 +15,10 @@ secrets/
 *.out
 coverage.txt
 
+# Test deployment (generated on the server by deploy/provision-test.sh)
+/docker-compose.test.yml
+/deploy/Caddyfile.test
+
 # SQLite data
 *.db
 *.db-shm

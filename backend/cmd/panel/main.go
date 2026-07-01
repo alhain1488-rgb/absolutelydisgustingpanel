@@ -2,10 +2,62 @@
 package main
 
 import (
-	"log"
+	"context"
+	"errors"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/config"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/db"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/httpapi"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/logging"
 )
 
 func main() {
-	// Phase 0 skeleton. Real wiring (config, db, http server) lands in Phase 1.
-	log.Println("xray-panel backend skeleton")
+	cfg, err := config.Load()
+	if err != nil {
+		// No logger yet; fail fast with a clear message.
+		os.Stderr.WriteString("config error: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+
+	logger := logging.New(cfg.LogLevel)
+
+	database, err := db.Open(cfg.DBPath)
+	if err != nil {
+		logger.Error("database init failed", "error", err)
+		os.Exit(1)
+	}
+	defer database.Close()
+
+	router := httpapi.NewRouter(httpapi.Deps{DB: database, Logger: logger})
+
+	srv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		logger.Info("backend listening", "addr", cfg.HTTPAddr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("http server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Graceful shutdown on SIGINT/SIGTERM.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	logger.Info("shutting down")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("graceful shutdown failed", "error", err)
+	}
 }

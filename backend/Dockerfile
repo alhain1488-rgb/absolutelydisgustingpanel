@@ -2,12 +2,11 @@
 FROM golang:1.24-alpine AS build
 WORKDIR /src
 
-# CGO is needed by the SQLite driver; enable it and pull build deps.
-RUN apk add --no-cache gcc musl-dev
-ENV CGO_ENABLED=1
+# Pure-Go SQLite driver (modernc.org/sqlite) — no CGO required.
+ENV CGO_ENABLED=0
 
-COPY go.mod go.sum* ./
-RUN go mod download || true
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 RUN go build -o /out/panel ./cmd/panel

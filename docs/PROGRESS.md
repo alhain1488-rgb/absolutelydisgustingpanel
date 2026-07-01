@@ -4,6 +4,26 @@
 
 <!-- Новые записи добавляются сверху. -->
 
+## Фаза 6 — Frontend
+
+**Сделано.**
+- Каркас: Vite + React + TS + Tailwind + React Router + TanStack Query;
+  `AuthProvider` (login → опц. TOTP-шаг → JWT в localStorage, `/me`),
+  `ThemeProvider` (dark/light через класс на `html`, сохраняется),
+  типизированный API-клиент, UI-примитивы (Button/Input/Select/Card/Modal/…).
+- Страницы: **Login** (+ шаг 2FA), **Dashboard** (счётчики + карточки серверов),
+  **Servers** (список + добавление, «Check»), **ServerDetail** (метрики CPU/RAM/
+  диск, рестарт Xray, CRUD inbound-ов с формой протокола/транспорта/Reality),
+  **Clients** (список + создание), **ClientDetail** (выдача доступа чекбоксами по
+  серверам, subscription-ссылка, QR, скачивание, rotate-token, enable/disable),
+  **Settings** (домен/базовый URL, тема, настройка и включение 2FA), **Logs**
+  (таблица аудита).
+- Типы API синхронизированы с `docs/openapi.yaml`; dev-прокси Vite на backend.
+
+**Проверено.**
+- `npm run build` (tsc + vite) — OK; `npm run test` (vitest) — 1 passed;
+  `npm run lint` (eslint) — чисто (0 warnings/errors).
+
 ## Фаза 5 — Клиенты, доступы и подписка
 
 **Сделано.**

@@ -4,6 +4,36 @@
 
 <!-- Новые записи добавляются сверху. -->
 
+## Фаза 4 — Inbound-ы и реестр протоколов
+
+**Сделано.**
+- `internal/protocols` — интерфейс `Protocol` (BuildInbound/BuildLink) + реестр;
+  адаптеры **VLESS** (Reality и TLS), **VMess**, **Trojan**, **Shadowsocks**;
+  общая схема параметров транспорта/безопасности (`Stream`) и протокол-настроек
+  (`Settings`) в JSON-полях (без ALTER TABLE); генерация X25519-ключей Reality
+  (base64 raw-URL, как `xray x25519`), shortId, SS-пароля. `hysteria2` —
+  зарегистрированная-как-документация заглушка (`ErrNotImplemented`, в реестр
+  MVP не добавлена).
+- `internal/inbounds` — модель + репозиторий (CRUD в рамках сервера) + сервис:
+  валидация протокола/порта, автогенерация ключей Reality/пароля SS на бэкенде,
+  дефолты; параметры хранятся в `settings_json`/`stream_settings_json`.
+- `internal/xrayconfig` — сборка полного `config.json` из inbound-ов и выданных
+  клиентов через реестр (log + inbounds + freedom/blackhole outbounds).
+- `internal/httpapi` — `/api/servers/{id}/inbounds` (list/create) и
+  `/api/inbounds/{id}` (get/update/delete) под JWT + аудит.
+- `test/xray-node` — Docker-образ (Go + xray-core) и интеграционный тест под
+  тегом `integration` (`TestGeneratedConfig_AcceptedByXray`): конфиг с
+  VLESS Reality + VMess + Trojan проходит `xray -test`.
+
+**Проверено.**
+- `go test ./...` — зелёно: реестр (каждый адаптер строит валидный inbound и
+  корректный URI; publicKey не утекает в конфиг Reality), генерация ключей,
+  сервис inbound-ов (Reality/SS автогенерация, валидация, update сохраняет ключи),
+  сборка `config.json` (3 протокола).
+- `go vet`, `gofmt -l .`, `golangci-lint run` — чисто (0 issues).
+- Живой `xray -test` — вне автономной среды (нет Docker-демона); инфраструктура
+  и тест готовы, прогон человеком/CI (см. `docs/QUESTIONS.md`).
+
 ## Фаза 3 — Управление серверами
 
 **Сделано.**

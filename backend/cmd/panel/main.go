@@ -10,7 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/audit"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/auth"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/config"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/crypto"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/db"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/httpapi"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/logging"
@@ -20,7 +23,7 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		// No logger yet; fail fast with a clear message.
-		os.Stderr.WriteString("config error: " + err.Error() + "\n")
+		_, _ = os.Stderr.WriteString("config error: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 
@@ -31,9 +34,32 @@ func main() {
 		logger.Error("database init failed", "error", err)
 		os.Exit(1)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
-	router := httpapi.NewRouter(httpapi.Deps{DB: database, Logger: logger})
+	cipher, err := crypto.NewCipher(cfg.EncryptionKey)
+	if err != nil {
+		logger.Error("cipher init failed", "error", err)
+		os.Exit(1)
+	}
+
+	adminRepo := auth.NewRepo(database)
+	tokens := auth.NewTokenManager(cfg.JWTSecret)
+	authSvc := auth.NewService(adminRepo, tokens, cipher, "Xray Panel")
+	auditRec := audit.New(database)
+
+	// Bootstrap the initial admin from configuration on first start.
+	if err := authSvc.Bootstrap(context.Background(), cfg.AdminUsername, cfg.AdminPassword); err != nil {
+		logger.Error("admin bootstrap failed", "error", err)
+		os.Exit(1)
+	}
+
+	router := httpapi.NewRouter(httpapi.Deps{
+		DB:           database,
+		Logger:       logger,
+		Auth:         authSvc,
+		Audit:        auditRec,
+		LoginLimiter: auth.NewRateLimiter(10, time.Minute),
+	})
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

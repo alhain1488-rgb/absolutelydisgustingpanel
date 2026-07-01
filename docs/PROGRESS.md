@@ -4,6 +4,27 @@
 
 <!-- Новые записи добавляются сверху. -->
 
+## Фаза 2 — Аутентификация и аудит
+
+**Сделано.**
+- `internal/auth` — репозиторий админа; логин по bcrypt; JWT-сессии
+  (`TokenManager`: полный `auth`-токен 12h + короткий `2fa`-pending 5m);
+  TOTP setup/enable/verify (`pquerna/otp`, QR через `skip2/go-qrcode`),
+  секрет хранится зашифрованным (AES-GCM); middleware Bearer-авторизации;
+  fixed-window rate-limiter; bootstrap первичного админа из env (идемпотентно).
+- `internal/audit` — `Recorder`: запись админ-действий в `audit_logs` (кто,
+  действие, объект, IP, UA, JSON-детали) и листинг (newest-first).
+- `internal/httpapi` — маршруты `/api/auth/*`: login, 2fa/verify, 2fa/setup,
+  2fa/enable, logout, me; аудит логина/2FA/logout; собственный trusted-proxy
+  `realIP` middleware вместо deprecated chi RealIP.
+- `cmd/panel` — сборка cipher/auth/audit, bootstrap админа, rate-limit логина.
+
+**Проверено.**
+- `go test ./...` — зелёно: login success/fail, полный цикл TOTP
+  (setup→enable→login-need2fa→verify), bootstrap idempotent, rate-limit
+  (window/reset), audit record+list, HTTP-флоу (401/200, `/me` с токеном и без).
+- `go vet ./...`, `gofmt -l .`, `golangci-lint run` — чисто (0 issues).
+
 ## Фаза 1 — Фундамент backend
 
 **Сделано.**

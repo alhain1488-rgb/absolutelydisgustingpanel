@@ -23,7 +23,7 @@ func TestReadyz_WithDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("db: %v", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	r := NewRouter(Deps{DB: database})
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)

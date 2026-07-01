@@ -11,7 +11,7 @@ func TestOpen_AppliesMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	// All core tables should exist.
 	for _, table := range []string{"admins", "servers", "inbounds", "clients", "client_inbounds", "audit_logs", "settings", "schema_migrations"} {
@@ -29,14 +29,14 @@ func TestOpen_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first open: %v", err)
 	}
-	d1.Close()
+	_ = d1.Close()
 
 	// Re-opening applies no migrations again and still works.
 	d2, err := Open(path)
 	if err != nil {
 		t.Fatalf("second open: %v", err)
 	}
-	defer d2.Close()
+	defer func() { _ = d2.Close() }()
 
 	var count int
 	if err := d2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
@@ -52,7 +52,7 @@ func TestForeignKeysEnforced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	// Inserting an inbound referencing a missing server must fail.
 	_, err = database.Exec(`INSERT INTO inbounds(server_id, tag, protocol, port) VALUES (999, 'x', 'vless', 443)`)

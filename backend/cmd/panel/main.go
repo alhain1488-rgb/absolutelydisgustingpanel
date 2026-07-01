@@ -12,6 +12,7 @@ import (
 
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/audit"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/auth"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/clients"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/config"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/crypto"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/db"
@@ -19,6 +20,8 @@ import (
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/inbounds"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/logging"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/servers"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/subscription"
+	syncengine "github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/sync"
 )
 
 func main() {
@@ -50,6 +53,9 @@ func main() {
 	auditRec := audit.New(database)
 	serversSvc := servers.NewService(servers.NewRepo(database), cipher, servers.NewIPAPIGeolocator())
 	inboundsSvc := inbounds.NewService(inbounds.NewRepo(database))
+	clientsSvc := clients.NewService(clients.NewRepo(database))
+	subBuilder := subscription.New(database)
+	syncEngine := syncengine.NewEngine(database, serversSvc)
 
 	// Bootstrap the initial admin from configuration on first start.
 	if err := authSvc.Bootstrap(context.Background(), cfg.AdminUsername, cfg.AdminPassword); err != nil {
@@ -65,6 +71,11 @@ func main() {
 		LoginLimiter: auth.NewRateLimiter(10, time.Minute),
 		Servers:      serversSvc,
 		Inbounds:     inboundsSvc,
+		Clients:      clientsSvc,
+		Subscription: subBuilder,
+		Sync:         syncEngine,
+		SubLimiter:   auth.NewRateLimiter(60, time.Minute),
+		SubBaseURL:   "https://" + cfg.Domain,
 	})
 
 	srv := &http.Server{

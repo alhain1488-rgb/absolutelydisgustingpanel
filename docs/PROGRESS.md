@@ -4,6 +4,34 @@
 
 <!-- Новые записи добавляются сверху. -->
 
+## Фаза 5 — Клиенты, доступы и подписка
+
+**Сделано.**
+- `internal/clients` — модель + репозиторий (CRUD, grants `client_inbounds`
+  транзакцией, токен) + сервис: генерация UUID/пароля/subscription-token,
+  enable/disable, выдача/отзыв доступа, rotate-token.
+- `internal/subscription` — сборка base64-подписки из всех разрешённых и
+  включённых inbound-ов клиента на всех серверах через реестр протоколов; список
+  raw-URI для админки; QR (PNG). Отключённый клиент → пустая подписка.
+- `internal/sync` — движок: сборка полного `config.json` сервера из включённых
+  inbound-ов и включённых выданных клиентов; пуш по SSH: mkdir → backup →
+  upload → `xray -test` (с восстановлением бэкапа при провале) → restart;
+  идемпотентность по SHA-256 (пустые пуши пропускаются); запись `last_sync_*`.
+- `internal/httpapi` — `/api/clients/*` (CRUD, enable/disable, inbounds,
+  rotate-token, links, qrcode, config), публичный rate-limited `GET /sub/{token}`,
+  `/api/dashboard/summary`, `/api/settings` (GET/PUT); best-effort авто-sync в
+  фоне при изменениях inbound-ов/доступов/клиентов.
+
+**Проверено.**
+- `go test ./...` — зелёно: клиенты (identity, grants replace, rotate,
+  enable/disable), subscription e2e (2 inbound-а на разных серверах → 2 URI;
+  disable → пусто; revoke → 1), QR PNG; sync (push-шаги, идемпотентность,
+  восстановление бэкапа при провале `xray -test`, запись ошибки).
+- `go vet`, `gofmt -l .`, `golangci-lint run` — чисто (0 issues).
+- Ручной e2e против запущенного backend: login → сервер → inbound (ключи Reality
+  сгенерированы) → клиент → выдача → `/sub` отдаёт валидный `vless://…` +
+  QR (image/png) + dashboard.
+
 ## Фаза 4 — Inbound-ы и реестр протоколов
 
 **Сделано.**

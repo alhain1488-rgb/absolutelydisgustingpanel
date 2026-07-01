@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -69,6 +71,7 @@ func (h *inboundHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "create", "inbound", created.ID, map[string]any{"tag": created.Tag, "protocol": created.Protocol, "server_id": serverID})
+	h.fireSyncServer(serverID)
 	writeJSON(w, http.StatusCreated, created)
 }
 
@@ -99,6 +102,7 @@ func (h *inboundHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "update", "inbound", updated.ID, map[string]any{"tag": updated.Tag})
+	h.fireSyncServer(updated.ServerID)
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -107,10 +111,18 @@ func (h *inboundHandler) delete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Capture the server id before deletion so we can resync it.
+	var serverID int64
+	if existing, err := h.deps.Inbounds.Repo().GetByID(r.Context(), id); err == nil {
+		serverID = existing.ServerID
+	}
 	if err := h.deps.Inbounds.Repo().Delete(r.Context(), id); h.handleErr(w, err) {
 		return
 	}
 	h.audit(r, "delete", "inbound", id, nil)
+	if serverID != 0 {
+		h.fireSyncServer(serverID)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -132,4 +144,16 @@ func (h *inboundHandler) audit(r *http.Request, action, targetType string, targe
 	}
 	adminID, _ := auth.AdminIDFromContext(r.Context())
 	_ = h.deps.Audit.Record(r.Context(), adminID, action, targetType, targetID, detail, clientIP(r), r.UserAgent())
+}
+
+// fireSyncServer pushes config to one server in the background, best-effort.
+func (h *inboundHandler) fireSyncServer(serverID int64) {
+	if h.deps.Sync == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		_, _ = h.deps.Sync.SyncServer(ctx, serverID)
+	}()
 }

@@ -16,8 +16,11 @@ import (
 
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/audit"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/auth"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/clients"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/inbounds"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/servers"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/subscription"
+	syncengine "github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/sync"
 )
 
 // Deps holds the dependencies handlers need.
@@ -29,6 +32,13 @@ type Deps struct {
 	LoginLimiter *auth.RateLimiter
 	Servers      *servers.Service
 	Inbounds     *inbounds.Service
+	Clients      *clients.Service
+	Subscription *subscription.Builder
+	Sync         *syncengine.Engine
+	SubLimiter   *auth.RateLimiter
+	// SubBaseURL is the public base (e.g. https://panel.example.com) used to
+	// build subscription URLs for QR codes and downloads.
+	SubBaseURL string
 }
 
 // NewRouter builds the top-level HTTP handler.
@@ -70,8 +80,16 @@ func NewRouter(deps Deps) http.Handler {
 			if deps.Inbounds != nil {
 				mountInbounds(r, deps)
 			}
+			if deps.Clients != nil {
+				mountClients(r, deps)
+			}
 			mountMisc(r, deps)
 		})
+	}
+
+	// Public subscription endpoint (token-authenticated, rate-limited).
+	if deps.Subscription != nil {
+		mountSubscription(r, deps)
 	}
 
 	return r

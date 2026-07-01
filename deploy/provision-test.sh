@@ -39,6 +39,21 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq curl ca-certificates openssl git >/dev/null
 
+# ── 1b. Swap (guard against OOM during the Go build on small VPSes) ──────────
+# The pure-Go SQLite driver compiles with a large memory footprint; on a 1–2 GB
+# box the build can trigger the OOM killer (which may take out sshd). Ensure at
+# least ~2 GB of swap exists.
+if [[ "$(free -m | awk '/^Swap:/{print $2}')" -lt 1024 ]]; then
+  if [[ ! -f /swapfile ]]; then
+    echo "==> Adding 2G swap to avoid OOM during build…"
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+  fi
+  swapon /swapfile 2>/dev/null || true
+  grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 # ── 2. Docker (+ compose plugin) ────────────────────────────────────────────
 if ! command -v docker >/dev/null 2>&1; then
   echo "==> Installing Docker…"

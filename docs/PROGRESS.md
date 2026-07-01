@@ -4,6 +4,28 @@
 
 <!-- Новые записи добавляются сверху. -->
 
+## Фаза 3 — Управление серверами
+
+**Сделано.**
+- `internal/ssh` — интерфейс `Runner` (Run/Upload) + реальный клиент на
+  `golang.org/x/crypto/ssh` (per-op dial, key/password auth, upload через
+  `cat > file`); парсинг метрик (`/proc/meminfo`, `df`, дельта `/proc/stat`,
+  uptime), детект статуса Xray (`systemctl is-active`), restart, `xray -test`,
+  ping; пакет `sshtest` с scriptable `FakeRunner` для юнит-тестов.
+- `internal/servers` — модель + репозиторий (CRUD, update check/sync-результата);
+  сервис: create/update с шифрованием SSH-секрета (AES-GCM), `Check`
+  (ping→status, DNS→IP, гео best-effort), `Stats`, `RestartXray`; фабрика
+  раннеров и резолвер инъектируемы (тесты на моках). Гео — `Geolocator`
+  (реализация ip-api, опциональна).
+- `internal/httpapi` — маршруты `/api/servers` (list/create/get/update/delete/
+  check/restart-xray/stats) под JWT + аудит; `/api/logs` (журнал аудита).
+
+**Проверено.**
+- `go test ./...` — зелёно: парсинг метрик (CPU 25%/MEM 50%/DISK), статус Xray,
+  restart-ошибка, ping; сервис — шифрование секрета, check online/offline+geo,
+  stats, update без перезаписи секрета; HTTP CRUD-флоу + 401/404.
+- `go vet`, `gofmt -l .`, `golangci-lint run` — чисто (0 issues).
+
 ## Фаза 2 — Аутентификация и аудит
 
 **Сделано.**

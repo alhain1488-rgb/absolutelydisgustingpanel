@@ -16,6 +16,7 @@ import (
 
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/audit"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/auth"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/servers"
 )
 
 // Deps holds the dependencies handlers need.
@@ -25,6 +26,7 @@ type Deps struct {
 	Auth         *auth.Service
 	Audit        *audit.Recorder
 	LoginLimiter *auth.RateLimiter
+	Servers      *servers.Service
 }
 
 // NewRouter builds the top-level HTTP handler.
@@ -57,6 +59,14 @@ func NewRouter(deps Deps) http.Handler {
 
 	if deps.Auth != nil {
 		mountAuth(r, deps)
+		// Authenticated API surface.
+		r.Group(func(r chi.Router) {
+			r.Use(deps.Auth.Tokens().Middleware)
+			if deps.Servers != nil {
+				mountServers(r, deps)
+			}
+			mountMisc(r, deps)
+		})
 	}
 
 	return r

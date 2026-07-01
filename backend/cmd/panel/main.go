@@ -17,6 +17,7 @@ import (
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/db"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/httpapi"
 	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/logging"
+	"github.com/alhain1488-rgb/absolutelydisgustingpanel/backend/internal/servers"
 )
 
 func main() {
@@ -46,6 +47,7 @@ func main() {
 	tokens := auth.NewTokenManager(cfg.JWTSecret)
 	authSvc := auth.NewService(adminRepo, tokens, cipher, "Xray Panel")
 	auditRec := audit.New(database)
+	serversSvc := servers.NewService(servers.NewRepo(database), cipher, servers.NewIPAPIGeolocator())
 
 	// Bootstrap the initial admin from configuration on first start.
 	if err := authSvc.Bootstrap(context.Background(), cfg.AdminUsername, cfg.AdminPassword); err != nil {
@@ -59,6 +61,7 @@ func main() {
 		Auth:         authSvc,
 		Audit:        auditRec,
 		LoginLimiter: auth.NewRateLimiter(10, time.Minute),
+		Servers:      serversSvc,
 	})
 
 	srv := &http.Server{

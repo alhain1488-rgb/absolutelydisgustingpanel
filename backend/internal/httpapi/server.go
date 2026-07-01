@@ -92,6 +92,9 @@ func NewRouter(deps Deps) http.Handler {
 		mountSubscription(r, deps)
 	}
 
+	// API documentation.
+	mountSwagger(r)
+
 	return r
 }
 

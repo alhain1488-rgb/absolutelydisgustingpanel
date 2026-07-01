@@ -4,6 +4,36 @@
 
 <!-- Новые записи добавляются сверху. -->
 
+## Фаза 7 — Сборка, документация, доставка
+
+**Сделано.**
+- Swagger: `/swagger` отдаёт интерактивный UI (swagger-ui-dist с CDN),
+  `/swagger/openapi.yaml` — встроенный (`go:embed`) контракт. Копия
+  `docs/openapi.yaml` лежит в `backend/internal/httpapi/openapi.yaml` для
+  эмбеда (держать в синхроне при изменении контракта).
+- `README.md` — полный: назначение, возможности, требования, быстрый старт,
+  таблица переменных окружения, подключение реального VPS, добавление протокола
+  через реестр, Swagger, troubleshooting, что делает человек.
+- `scripts/smoke.sh` — смоук из `SPEC.md §12`: healthz → login → сервер (мок) →
+  inbound → клиент → выдача → `GET /sub/{token}` возвращает непустую валидную
+  подписку.
+- Инфраструктура доставки: `docker-compose.yml` (backend + frontend-статика +
+  Caddy TLS/reverse-proxy), `deploy/Caddyfile` (маршрутизация `/api` `/sub`
+  `/swagger` на backend, SPA-fallback на статику).
+
+**Проверено.**
+- `go build/vet/test`, `gofmt -l .`, `golangci-lint run` — чисто; `npm run
+  build/test/lint` — чисто; `docker compose config` — валиден.
+- Ручной прогон против запущенного backend: `/swagger/` → 200,
+  `/swagger/openapi.yaml` → 200 (application/yaml); `scripts/smoke.sh` → SMOKE OK
+  (валидный `vless://…`).
+
+**Definition of Done.** Полный проходной путь (`cp .env.example .env` → запуск →
+вход c опц. 2FA → сервер → inbound-ы → клиент → рабочая subscription-ссылка + QR
+→ дашборд, Swagger на `/swagger`) реализован и покрыт тестами. Живой
+`docker compose up` на проде и наведение на реальные VPS — за человеком
+(Docker-демон в среде разработки недоступен; см. `docs/QUESTIONS.md`).
+
 ## Фаза 6 — Frontend
 
 **Сделано.**

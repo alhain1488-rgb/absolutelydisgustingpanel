@@ -1,0 +1,47 @@
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DB_PATH: /data/panel.db
+      PANEL_HTTP_ADDR: ":8080"
+    volumes:
+      - panel-data:/data
+    expose:
+      - "8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    # Build the SPA into a shared volume that Caddy serves as static files.
+    command: >
+      sh -c "cp -r /usr/share/nginx/html/* /srv/www/ && echo 'frontend assets published'"
+    volumes:
+      - web-root:/srv/www
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - backend
+      - frontend
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - web-root:/srv/www:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  panel-data:
+  web-root:
+  caddy-data:
+  caddy-config:

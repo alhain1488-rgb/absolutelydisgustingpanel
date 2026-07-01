@@ -1,0 +1,34 @@
+# Environment / secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+secrets/
+
+# Go
+/backend/panel
+/backend/bin/
+*.test
+*.out
+coverage.txt
+
+# SQLite data
+*.db
+*.db-shm
+*.db-wal
+/data/
+
+# Node / frontend
+node_modules/
+/frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

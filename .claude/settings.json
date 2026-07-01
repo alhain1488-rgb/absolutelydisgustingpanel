@@ -41,12 +41,7 @@
       "Bash(mv:*)",
       "Bash(sqlite3:*)",
       "Bash(curl http://localhost:*)",
-      "Bash(curl http://127.0.0.1:*)"
-    ],
-    "ask": [
-      "Bash(git push:*)"
-    ],
-    "deny": [
+      "Bash(curl http://127.0.0.1:*)",
       "Read(**/.env)",
       "Read(**/.env.local)",
       "Read(**/.env.production)",
@@ -62,6 +57,11 @@
       "Bash(git reset --hard:*)",
       "Bash(git clean:*)",
       "Bash(docker compose down -v:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
+    "deny": [
     ]
   }
 }

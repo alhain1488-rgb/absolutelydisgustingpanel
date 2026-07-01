@@ -1,0 +1,667 @@
+openapi: 3.0.3
+info:
+  title: Xray Panel API
+  description: >
+    REST API for a personal multi-VPS Xray control panel. One admin manages
+    servers, inbounds, clients and subscriptions. Design-first contract; kept in
+    sync with the Go implementation via swaggo/swag.
+  version: 0.1.0
+servers:
+  - url: /
+tags:
+  - name: Auth
+  - name: Servers
+  - name: Inbounds
+  - name: Clients
+  - name: Subscription
+  - name: Misc
+
+paths:
+  # ── Auth ────────────────────────────────────────────────────────────
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with username/password. Returns token or need_2fa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/2fa/verify:
+    post:
+      tags: [Auth]
+      summary: Verify TOTP code during login (second factor).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TotpCodeRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: Start TOTP enrollment; returns otpauth URL and QR (data URI).
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TotpSetupResponse' }
+  /api/auth/2fa/enable:
+    post:
+      tags: [Auth]
+      summary: Confirm and enable TOTP with a valid code.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TotpCodeRequest' }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate the current session.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current admin profile.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admin' }
+
+  # ── Servers ─────────────────────────────────────────────────────────
+  /api/servers:
+    get:
+      tags: [Servers]
+      summary: List servers.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Server' }
+    post:
+      tags: [Servers]
+      summary: Create a server.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServerInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+  /api/servers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [Servers]
+      summary: Get a server.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Servers]
+      summary: Update a server.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServerInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+    delete:
+      tags: [Servers]
+      summary: Delete a server.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: No Content }
+  /api/servers/{id}/check:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    post:
+      tags: [Servers]
+      summary: Check reachability, resolve IP/geo, detect Xray status.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+  /api/servers/{id}/restart-xray:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    post:
+      tags: [Servers]
+      summary: Restart the Xray service on the server.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/servers/{id}/stats:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Servers]
+      summary: CPU/RAM/disk metrics over SSH.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServerStats' }
+
+  # ── Inbounds ────────────────────────────────────────────────────────
+  /api/servers/{id}/inbounds:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Inbounds]
+      summary: List inbounds of a server.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Inbound' }
+    post:
+      tags: [Inbounds]
+      summary: Create an inbound on a server.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InboundInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Inbound' }
+  /api/inbounds/{id}:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Inbounds]
+      summary: Get an inbound.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Inbound' }
+    put:
+      tags: [Inbounds]
+      summary: Update an inbound.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InboundInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Inbound' }
+    delete:
+      tags: [Inbounds]
+      summary: Delete an inbound.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: No Content }
+
+  # ── Clients ─────────────────────────────────────────────────────────
+  /api/clients:
+    get:
+      tags: [Clients]
+      summary: List clients.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Client' }
+    post:
+      tags: [Clients]
+      summary: Create a client (generates uuid/password/token).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+  /api/clients/{id}:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Clients]
+      summary: Get a client.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+    put:
+      tags: [Clients]
+      summary: Update a client (rename, remark).
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+    delete:
+      tags: [Clients]
+      summary: Delete a client.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: No Content }
+  /api/clients/{id}/enable:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    post:
+      tags: [Clients]
+      summary: Enable a client.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/clients/{id}/disable:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    post:
+      tags: [Clients]
+      summary: Disable a client without deleting.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/clients/{id}/inbounds:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    put:
+      tags: [Clients]
+      summary: Grant/revoke access to a set of inbounds.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InboundGrantRequest' }
+      responses:
+        '200': { description: OK }
+  /api/clients/{id}/rotate-token:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    post:
+      tags: [Clients]
+      summary: Rotate the subscription token ("refresh configuration").
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Client' }
+  /api/clients/{id}/links:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Clients]
+      summary: Ready-to-use connection URIs for the client.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+  /api/clients/{id}/qrcode:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Clients]
+      summary: QR code (PNG) for the subscription URL.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+  /api/clients/{id}/config:
+    parameters: [{ $ref: '#/components/parameters/IdPath' }]
+    get:
+      tags: [Clients]
+      summary: Download subscription config file.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string }
+
+  # ── Subscription (public) ───────────────────────────────────────────
+  /sub/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Subscription]
+      summary: Public base64 subscription built from allowed inbounds.
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Misc ────────────────────────────────────────────────────────────
+  /api/dashboard/summary:
+    get:
+      tags: [Misc]
+      summary: Dashboard summary (counts, server statuses, last sync).
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSummary' }
+  /api/logs:
+    get:
+      tags: [Misc]
+      summary: Audit log entries.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditLog' }
+  /api/settings:
+    get:
+      tags: [Misc]
+      summary: Get settings (key-value).
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: { type: string }
+    put:
+      tags: [Misc]
+      summary: Update settings.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: { type: string }
+      responses:
+        '200': { description: OK }
+  /healthz:
+    get:
+      tags: [Misc]
+      summary: Liveness probe.
+      responses:
+        '200': { description: OK }
+  /readyz:
+    get:
+      tags: [Misc]
+      summary: Readiness probe (DB reachable).
+      responses:
+        '200': { description: OK }
+        '503': { description: Not ready }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string, nullable: true }
+        need_2fa: { type: boolean }
+    TokenResponse:
+      type: object
+      properties:
+        token: { type: string }
+    TotpCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string }
+    TotpSetupResponse:
+      type: object
+      properties:
+        otpauth_url: { type: string }
+        qr: { type: string, description: "data:image/png;base64,..." }
+    Admin:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        totp_enabled: { type: boolean }
+    Server:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        host: { type: string }
+        ssh_port: { type: integer }
+        ssh_user: { type: string }
+        ssh_auth_method: { type: string, enum: [key, password] }
+        xray_config_path: { type: string }
+        xray_service_name: { type: string }
+        ip: { type: string }
+        geo_country: { type: string }
+        geo_city: { type: string }
+        geo_asn: { type: string }
+        status: { type: string, enum: [unknown, online, offline, error] }
+        last_check_at: { type: string, format: date-time, nullable: true }
+        last_sync_at: { type: string, format: date-time, nullable: true }
+        last_sync_error: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ServerInput:
+      type: object
+      required: [name, host, ssh_user, ssh_auth_method]
+      properties:
+        name: { type: string }
+        host: { type: string }
+        ssh_port: { type: integer, default: 22 }
+        ssh_user: { type: string }
+        ssh_auth_method: { type: string, enum: [key, password] }
+        ssh_secret: { type: string, description: "Private key or password (write-only)" }
+        ssh_passphrase: { type: string }
+        xray_config_path: { type: string, default: /usr/local/etc/xray/config.json }
+        xray_service_name: { type: string, default: xray }
+    ServerStats:
+      type: object
+      properties:
+        cpu_percent: { type: number }
+        mem_percent: { type: number }
+        mem_total_mb: { type: integer }
+        mem_used_mb: { type: integer }
+        disk_percent: { type: number }
+        disk_total_gb: { type: integer }
+        disk_used_gb: { type: integer }
+        uptime_seconds: { type: integer }
+    Inbound:
+      type: object
+      properties:
+        id: { type: integer }
+        server_id: { type: integer }
+        tag: { type: string }
+        protocol: { type: string, enum: [vless, vmess, trojan, shadowsocks] }
+        listen: { type: string }
+        port: { type: integer }
+        settings_json: { type: object }
+        stream_settings_json: { type: object }
+        sniffing_json: { type: object }
+        remark: { type: string }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    InboundInput:
+      type: object
+      required: [tag, protocol, port]
+      properties:
+        tag: { type: string }
+        protocol: { type: string, enum: [vless, vmess, trojan, shadowsocks] }
+        listen: { type: string, default: "0.0.0.0" }
+        port: { type: integer }
+        settings_json: { type: object }
+        stream_settings_json: { type: object }
+        sniffing_json: { type: object }
+        remark: { type: string }
+        enabled: { type: boolean, default: true }
+    Client:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        uuid: { type: string }
+        password: { type: string }
+        subscription_token: { type: string }
+        enabled: { type: boolean }
+        remark: { type: string }
+        inbound_ids:
+          type: array
+          items: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ClientInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        remark: { type: string }
+    InboundGrantRequest:
+      type: object
+      required: [inbound_ids]
+      properties:
+        inbound_ids:
+          type: array
+          items: { type: integer }
+    DashboardSummary:
+      type: object
+      properties:
+        clients_total: { type: integer }
+        clients_enabled: { type: integer }
+        servers_total: { type: integer }
+        servers_online: { type: integer }
+        last_sync_at: { type: string, format: date-time, nullable: true }
+        servers:
+          type: array
+          items: { $ref: '#/components/schemas/Server' }
+    AuditLog:
+      type: object
+      properties:
+        id: { type: integer }
+        admin_id: { type: integer }
+        action: { type: string }
+        target_type: { type: string }
+        target_id: { type: integer }
+        detail_json: { type: object }
+        ip: { type: string }
+        user_agent: { type: string }
+        created_at: { type: string, format: date-time }

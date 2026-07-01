@@ -1,0 +1,19 @@
+# Caddy serves the SPA and reverse-proxies the API + subscription endpoint.
+# TLS is auto-provisioned via Let's Encrypt for {$PANEL_DOMAIN}.
+
+{$PANEL_DOMAIN} {
+	encode gzip
+
+	# Backend API and public subscription endpoint.
+	@backend path /api/* /sub/* /swagger/* /healthz /readyz
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+
+	# Static SPA with client-side routing fallback.
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

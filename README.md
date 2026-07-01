@@ -1,3 +1,0 @@
-# absolutelydisgustingpanel
-
-Initial commit.
